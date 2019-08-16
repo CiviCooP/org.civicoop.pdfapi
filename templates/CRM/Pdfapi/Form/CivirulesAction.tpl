@@ -15,6 +15,16 @@
   </div>
 
   <div class="crm-section">
+    <div class="label">{$form.from_email.label}</div>
+    <div class="content">{$form.from_email.html}</div>
+    <div class="clear"></div>
+  </div>
+  <div class="crm-section">
+    <div class="label">{$form.from_name.label}</div>
+    <div class="content">{$form.from_name.html}</div>
+    <div class="clear"></div>
+  </div>
+  <div class="crm-section">
     <div class="label">{$form.to_email.label}</div>
     <div class="content">{$form.to_email.html}</div>
     <div class="clear"></div>
