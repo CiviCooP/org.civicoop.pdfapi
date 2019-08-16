@@ -30,6 +30,20 @@ function _civicrm_api3_pdf_create_spec(&$spec) {
     'api.required' => 0,
     'type' => CRM_Utils_Type::T_STRING,
   );
+  $spec['from_email'] = array(
+    'name' => 'from_email',
+    'title' => 'from email address',
+    'description' => 'the e-mail address the PDF will be sent from',
+    'api.required' => 0,
+    'type' => CRM_Utils_Type::T_STRING,
+  );
+  $spec['from_name'] = array(
+    'name' => 'from_name',
+    'title' => 'from email name',
+    'description' => 'the e-mail name the PDF will be sent from',
+    'api.required' => 0,
+    'type' => CRM_Utils_Type::T_STRING,
+  );
   $spec['body_template_id'] = array(
     'name' => 'body_template_id',
     'title' => 'template ID email body',

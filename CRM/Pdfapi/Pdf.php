@@ -18,7 +18,8 @@ class CRM_Pdfapi_Pdf {
   private $_cleanName = NULL;
   private $_fullPathName = NULL;
   private $_version = NULL;
-  private $_from = NULL;
+  private $_from_email = NULL;
+  private $_from_name  = NULL;
   private $_contactIds = array();
 
   public function __construct($params) {
@@ -36,7 +37,9 @@ class CRM_Pdfapi_Pdf {
     $domain  = CRM_Core_BAO_Domain::getDomain();
     $this->_version = CRM_Core_BAO_Domain::version();
     $html    = array();
-    $this->_from = CRM_Core_BAO_Domain::getNameAndEmail();
+    list($from_name, $from_email) = CRM_Core_BAO_Domain::getNameAndEmail();
+    $this->_from_name = isset($this->_apiParams['from_name']) ? $this->_apiParams['from_name'] : $from_name;
+    $this->_from_email = isset($this->_apiParams['from_email']) ? $this->_apiParams['from_email'] : $from_email;
     if (!preg_match('/[0-9]+(,[0-9]+)*/i', $this->_apiParams['contact_id'])) {
       throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
     }
@@ -177,7 +180,7 @@ class CRM_Pdfapi_Pdf {
   private function sendPdf($email) {
     $mailParams = array(
       'groupName' => 'PDF Letter API',
-      'from' => $this->_from[0] . ' <' . $this->_from[1] . '>',
+      'from' => $this->_from_email . ' <' . $this->_from_name . '>',
       'fromName' => $this->_from[0],
       'toEmail' => $email,
       'subject' => $this->_emailSubject,
