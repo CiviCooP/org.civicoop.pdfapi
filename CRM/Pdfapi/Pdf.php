@@ -181,7 +181,7 @@ class CRM_Pdfapi_Pdf {
     $mailParams = array(
       'groupName' => 'PDF Letter API',
       'from' => $this->_from_email . ' <' . $this->_from_name . '>',
-      'fromName' => $this->_from[0],
+      'fromName' => $this->_from_name,
       'toEmail' => $email,
       'subject' => $this->_emailSubject,
       'html' => $this->_htmlMessageEmail,
