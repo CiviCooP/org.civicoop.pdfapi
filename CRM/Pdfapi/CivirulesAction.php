@@ -69,6 +69,12 @@ class CRM_Pdfapi_CivirulesAction extends CRM_CivirulesActions_Generic_Api {
       1 => $params['to_email'],
       2 => $templateTitle,
     ));
+    if(isset($params['from_email']) && !empty ($params['from_email'])) {
+      $prettyTxt .= ts(' , email is sent from email address "' ) . $params['from_email'] . '"';
+    }
+    if(isset($params['from_name']) && !empty ($params['from_name'])) {
+      $prettyTxt .= ts(' , email sender name is "' ) . $params['from_name'] . '"';
+    }
     if (isset($params['body_template_id']) && !empty($params['body_template_id'])) {
       $bodyTemplateTitle = $this->getTemplateTitle($params['body_template_id']);
       $prettyTxt .= ts(' , template for e-mail body "') . $bodyTemplateTitle . '"';
