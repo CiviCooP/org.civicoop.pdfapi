@@ -89,6 +89,9 @@ class CRM_Pdfapi_Form_CivirulesAction extends CRM_Core_Form {
     $this->addButtons(array(
       array('type' => 'next', 'name' => ts('Save'), 'isDefault' => TRUE,),
       array('type' => 'cancel', 'name' => ts('Cancel'))));
+    list($default_from_name, $default_from_email) = CRM_Core_BAO_Domain::getNameAndEmail();
+    $this->assign('default_from_name',$default_from_name);
+    $this->assign('default_from_email',$default_from_email);
   }
 
   /**
