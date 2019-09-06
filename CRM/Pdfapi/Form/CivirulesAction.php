@@ -72,6 +72,9 @@ class CRM_Pdfapi_Form_CivirulesAction extends CRM_Core_Form {
   function buildQuickForm() {
     $this->setFormTitle();
     $this->add('hidden', 'rule_action_id');
+    $this->add('text', 'from_email', ts('From e-mail address'), array(),FALSE);
+    $this->addRule('from_email', ts('Email is not valid.'), 'email');
+    $this->add('text', 'from_name', ts('From e-mail name'), array(),FALSE);
     $this->add('text', 'to_email', ts('To e-mail address'), array(),FALSE);
     $this->addRule('to_email', ts('Email is not valid.'), 'email');
     $this->add('select', 'template_id', ts('Message template for the PDF'), $this->getMessageTemplates(), TRUE);
@@ -86,6 +89,9 @@ class CRM_Pdfapi_Form_CivirulesAction extends CRM_Core_Form {
     $this->addButtons(array(
       array('type' => 'next', 'name' => ts('Save'), 'isDefault' => TRUE,),
       array('type' => 'cancel', 'name' => ts('Cancel'))));
+    list($default_from_name, $default_from_email) = CRM_Core_BAO_Domain::getNameAndEmail();
+    $this->assign('default_from_name',$default_from_name);
+    $this->assign('default_from_email',$default_from_email);
   }
 
   /**
@@ -100,6 +106,15 @@ class CRM_Pdfapi_Form_CivirulesAction extends CRM_Core_Form {
     $defaultValues['rule_action_id'] = $this->_civiRuleRuleActionId;
     if (!empty($this->_civiRuleRuleAction->action_params)) {
       $data = unserialize($this->_civiRuleRuleAction->action_params);
+    }
+    if (!empty($data['from_email'])) {
+      $defaultValues['from_email'] = $data['from_email'];
+    }
+    if (!empty($data['from_name'])) {
+      $defaultValues['from_name'] = $data['from_name'];
+    }
+    if (!empty($data['to_email'])) {
+      $defaultValues['to_email'] = $data['to_email'];
     }
     if (!empty($data['to_email'])) {
       $defaultValues['to_email'] = $data['to_email'];
@@ -131,6 +146,8 @@ class CRM_Pdfapi_Form_CivirulesAction extends CRM_Core_Form {
    * @access public
    */
   public function postProcess() {
+    $data['from_email'] = $this->_submitValues['from_email'];
+    $data['from_name'] = $this->_submitValues['from_name'];
     $data['to_email'] = $this->_submitValues['to_email'];
     $data['template_id'] = $this->_submitValues['template_id'];
     $data['body_template_id'] = $this->_submitValues['body_template_id'];

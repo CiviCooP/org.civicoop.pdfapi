@@ -3,6 +3,7 @@
   <div class="help-block" id="help">
     {ts}<p>This is the form where you can set what is going to happen with the PDF.</p>
       <p>Overall the Send PDF action will send an email with a PDF as an attachment to a single e-mailaddress or to the e-mailaddresses of the contacts involved (usually one).</p>
+      <p>The <strong>From e-mail address</strong> and <strong>From e-mail name</strong> are optional. They allow you to override the default email address (<em>{$default_from_email}</em>) and email name (<em>{$default_from_name}</em>)</p>
 
       <p>The <strong>To e-mail address</strong> is optional. It allows you to specify a single e-mail address where the PDF will be sent to. This makes sense if you ALWAYS want to send the PDF to a specific e-mailaddress, for example the e-mailaddress for the printer. Leave this empty if you want to send the PDF to the e-mailaddress of the contact(s) that are touched by your rule (for example send a PDF by e-mail to the new individual that has just been created).</p>
       <p>The <strong>Message template for the PDF</strong> is mandatory. Here you select the template that will be used for the PDF.</p>
@@ -14,6 +15,16 @@
     {/ts}
   </div>
 
+  <div class="crm-section">
+    <div class="label">{$form.from_email.label}</div>
+    <div class="content">{$form.from_email.html}</div>
+    <div class="clear"></div>
+  </div>
+  <div class="crm-section">
+    <div class="label">{$form.from_name.label}</div>
+    <div class="content">{$form.from_name.html}</div>
+    <div class="clear"></div>
+  </div>
   <div class="crm-section">
     <div class="label">{$form.to_email.label}</div>
     <div class="content">{$form.to_email.html}</div>
