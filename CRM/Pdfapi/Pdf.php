@@ -18,8 +18,8 @@ class CRM_Pdfapi_Pdf {
   private $_cleanName = NULL;
   private $_fullPathName = NULL;
   private $_version = NULL;
-  private $_from_email = NULL;
-  private $_from_name  = NULL;
+  private $_fromEmail = NULL;
+  private $_fromName  = NULL;
   private $_contactIds = array();
 
   public function __construct($params) {
@@ -37,9 +37,9 @@ class CRM_Pdfapi_Pdf {
     $domain  = CRM_Core_BAO_Domain::getDomain();
     $this->_version = CRM_Core_BAO_Domain::version();
     $html    = array();
-    list($from_name, $from_email) = CRM_Core_BAO_Domain::getNameAndEmail();
-    $this->_from_name = isset($this->_apiParams['from_name']) && !empty($this->_apiParams['from_name']) ? $this->_apiParams['from_name'] : $from_name;
-    $this->_from_email = isset($this->_apiParams['from_email']) && !empty($this->_apiParams['from_email']) ? $this->_apiParams['from_email'] : $from_email;
+    list($fromName, $fromEmail) = CRM_Core_BAO_Domain::getNameAndEmail();
+    $this->_fromName = isset($this->_apiParams['from_name']) && !empty($this->_apiParams['from_name']) ? $this->_apiParams['from_name'] : $fromName;
+    $this->_fromEmail = isset($this->_apiParams['from_email']) && !empty($this->_apiParams['from_email']) ? $this->_apiParams['from_email'] : $fromEmail;
     if (!preg_match('/[0-9]+(,[0-9]+)*/i', $this->_apiParams['contact_id'])) {
       throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
     }
@@ -61,15 +61,27 @@ class CRM_Pdfapi_Pdf {
       else {
         $this->_emailSubject = $this->_messageTemplatesEmail->msg_subject;
       }
-      $tokensEmail = CRM_Utils_Token::getTokens($this->_htmlMessageEmail);
+      $tokensEmail = array_merge_recursive(CRM_Utils_Token::getTokens($this->_htmlMessageEmail),
+        CRM_Utils_Token::getTokens($this->_emailSubject));
     }
 
     // get replacement text for these tokens
     $returnProperties = $this->getReturnProperties($messageTokens);
     foreach($this->_contactIds as $contactId) {
+      try {
+        $contact = civicrm_api3('Contact', 'getsingle', ['id' => $contactId]);
+      }
+      catch (CiviCRM_API3_Exception $ex) {
+        throw new API_Exception(ts('Could not find contact data with contact getsingle for contact id ') . $contactId . ' in '
+          . __METHOD__ . ts(', error message from API Contact getsingle: ') .$ex->getMessage());
+      }
       $this->_htmlMessage = $htmlTemplate;
       list($details) = CRM_Utils_Token::getTokenDetails(array($contactId), $returnProperties, false, false, null, $messageTokens);
       $contact = reset( $details );
+      // add case_id if present
+      if (isset($this->_apiParams['case_id']) && !empty($this->_apiParams['case_id'])) {
+        $contact['case_id'] = $this->_apiParams['case_id'];
+      }
       if (isset($contact['do_not_mail']) && $contact['do_not_mail'] == TRUE) {
         if(count($this->_contactIds) == 1)
           throw new API_Exception('Suppressed creating pdf letter for: '.$contact['display_name'].' because DO NOT MAIL is set');
@@ -88,7 +100,10 @@ class CRM_Pdfapi_Pdf {
         else
           continue;
       }
-
+      CRM_Utils_Hook::tokenValues($contact, $contactId, NULL, $messageTokens);
+      if (isset($tokensEmail)) {
+        CRM_Utils_Hook::tokenValues($contact, $contactId, NULL, $tokensEmail);
+      }
       // call token hook
       $hookTokens = array();
       CRM_Utils_Hook::tokens($hookTokens);
@@ -180,8 +195,8 @@ class CRM_Pdfapi_Pdf {
   private function sendPdf($email) {
     $mailParams = array(
       'groupName' => 'PDF Letter API',
-      'from' => $this->_from_name . ' <' . $this->_from_email . '>',
-      'fromName' => $this->_from_name,
+      'from' => $this->_fromName . ' <' . $this->_fromEmail . '>',
+      'fromName' => $this->_fromName,
       'toEmail' => $email,
       'subject' => $this->_emailSubject,
       'html' => $this->_htmlMessageEmail,
