@@ -109,11 +109,11 @@ class CRM_Pdfapi_Pdf {
       CRM_Utils_Hook::tokens($hookTokens);
       $categories = array_keys($hookTokens);
 
-      CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessage, NULL, $contact['contact_id']);
       $this->_htmlMessage = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessage, $domain, TRUE, $messageTokens, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceContactTokens($this->_htmlMessage, $contact, FALSE, $messageTokens, FALSE, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessage, $contact, $messageTokens, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceHookTokens($this->_htmlMessage, $contact , $categories, TRUE);
+      CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessage, NULL, $contact['contact_id']);
       if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
         $smarty = CRM_Core_Smarty::singleton();
         // also add the contact tokens to the template
@@ -124,11 +124,11 @@ class CRM_Pdfapi_Pdf {
       $html[] = $this->_htmlMessage;
 
       if ($templateEmailId) {
-        CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessageEmail, NULL, $contact['contact_id']);
         $this->_htmlMessageEmail = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessageEmail, $domain, TRUE, $tokensEmail, TRUE);
         $this->_htmlMessageEmail = CRM_Utils_Token::replaceContactTokens($this->_htmlMessageEmail, $contact, FALSE, $tokensEmail, FALSE, TRUE);
         $this->_htmlMessageEmail = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessageEmail, $contact, $tokensEmail, TRUE);
         $this->_htmlMessageEmail = CRM_Utils_Token::replaceHookTokens($this->_htmlMessageEmail, $contact , $categories, TRUE);
+        CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessageEmail, NULL, $contact['contact_id']);
         if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
           $smarty = CRM_Core_Smarty::singleton();
           // also add the contact tokens to the template
