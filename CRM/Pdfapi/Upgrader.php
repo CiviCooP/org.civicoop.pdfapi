@@ -15,11 +15,9 @@ class CRM_Pdfapi_Upgrader extends CRM_Pdfapi_Upgrader_Base {
   public function install() {
     // if CiviRules installed
     try {
-      $extensions = civicrm_api3('Extension', 'get');
-      foreach($extensions['values'] as $ext) {
-        if ($ext['key'] == 'org.civicoop.civirules' &&$ext['status'] == 'installed') {
-          $this->executeSqlFile('sql/insertSendPDFAction.sql');
-        }
+      $extensions = civicrm_api3('Extension', 'getcount', ['key' => 'org.civicoop.civirules', 'status' => 'installed']);
+      if ($extensions > 0) {
+        $this->executeSqlFile('sql/insertSendPDFAction.sql');
       }
     } catch (CiviCRM_API3_Exception $ex) {
     }
@@ -32,16 +30,14 @@ class CRM_Pdfapi_Upgrader extends CRM_Pdfapi_Upgrader_Base {
     $this->ctx->log->info('Applying update 1001 (remove managed entity');
     // if CiviRules installed
     try {
-      $extensions = civicrm_api3('Extension', 'get');
-      foreach($extensions['values'] as $ext) {
-        if ($ext['key'] == 'org.civicoop.civirules' &&$ext['status'] == 'installed') {
-          if (CRM_Core_DAO::checkTableExists('civicrm_managed')) {
-            $query = 'DELETE FROM civicrm_managed WHERE module = %1 AND entity_type = %2';
-            CRM_Core_DAO::executeQuery($query, array(
-              1 => array('org.civicoop.pdfapi', 'String'),
-              2 => array('CiviRuleAction', 'String'),
-            ));
-          }
+      $extensions = civicrm_api3('Extension', 'getcount', ['key' => 'org.civicoop.civirules', 'status' => 'installed']);
+      if ($extensions > 0) {
+        if (CRM_Core_DAO::checkTableExists('civicrm_managed')) {
+          $query = 'DELETE FROM civicrm_managed WHERE module = %1 AND entity_type = %2';
+          CRM_Core_DAO::executeQuery($query, array(
+            1 => array('org.civicoop.pdfapi', 'String'),
+            2 => array('CiviRuleAction', 'String'),
+          ));
         }
       }
     } catch (CiviCRM_API3_Exception $ex) {
@@ -56,36 +52,33 @@ class CRM_Pdfapi_Upgrader extends CRM_Pdfapi_Upgrader_Base {
     $this->ctx->log->info('Applying update 1002 (introduce email body template and email subject');
     // if CiviRules installed
     try {
-      $extensions = civicrm_api3('Extension', 'get');
-      foreach($extensions['values'] as $ext) {
-        if ($ext['key'] == 'org.civicoop.civirules' &&$ext['status'] == 'installed') {
-
-          $query = "SELECT id FROM civirule_action WHERE name = %1 AND class_name = %2";
-          $actionId = CRM_Core_DAO::singleValueQuery($query, array(
-            1 => array('pdfapi_send', 'String'),
-            2 => array('CRM_Pdfapi_CivirulesAction', 'String'),
-          ));
-          if ($actionId) {
-            // update params in rule action if any present
-            $query = "SELECT id, action_params FROM civirule_rule_action WHERE action_id = %1";
-            $dao = CRM_Core_DAO::executeQuery($query, array(1 => array((int) $actionId, 'Integer')));
-            while ($dao->fetch()) {
-              $actionParams = unserialize($dao->action_params);
-              $updateRuleAction = FALSE;
-              if (!isset($actionParams['body_template_id'])) {
-                $actionParams['body_template_id'] = "";
-                $updateRuleAction = TRUE;
-              }
-              if (!isset($actionParams['email_subject'])) {
-                $actionParams['email_subject'] = "";
-                $updateRuleAction = TRUE;
-              }
-              if ($updateRuleAction) {
-                $ruleAction = new CRM_Civirules_BAO_RuleAction();
-                $ruleAction->id = $dao->id;
-                $ruleAction->action_params = serialize($actionParams);
-                $ruleAction->save();
-              }
+      $extensions = civicrm_api3('Extension', 'getcount', ['key' => 'org.civicoop.civirules', 'status' => 'installed']);
+      if ($extensions > 0) {
+        $query = "SELECT id FROM civirule_action WHERE name = %1 AND class_name = %2";
+        $actionId = CRM_Core_DAO::singleValueQuery($query, array(
+          1 => array('pdfapi_send', 'String'),
+          2 => array('CRM_Pdfapi_CivirulesAction', 'String'),
+        ));
+        if ($actionId) {
+          // update params in rule action if any present
+          $query = "SELECT id, action_params FROM civirule_rule_action WHERE action_id = %1";
+          $dao = CRM_Core_DAO::executeQuery($query, array(1 => array((int) $actionId, 'Integer')));
+          while ($dao->fetch()) {
+            $actionParams = unserialize($dao->action_params);
+            $updateRuleAction = FALSE;
+            if (!isset($actionParams['body_template_id'])) {
+              $actionParams['body_template_id'] = "";
+              $updateRuleAction = TRUE;
+            }
+            if (!isset($actionParams['email_subject'])) {
+              $actionParams['email_subject'] = "";
+              $updateRuleAction = TRUE;
+            }
+            if ($updateRuleAction) {
+              $ruleAction = new CRM_Civirules_BAO_RuleAction();
+              $ruleAction->id = $dao->id;
+              $ruleAction->action_params = serialize($actionParams);
+              $ruleAction->save();
             }
           }
         }
@@ -102,37 +95,35 @@ class CRM_Pdfapi_Upgrader extends CRM_Pdfapi_Upgrader_Base {
     $this->ctx->log->info('Applying update 1002 (introduce email and/or pdf activity)');
     // if CiviRules installed
     try {
-      $extensions = civicrm_api3('Extension', 'get');
-      foreach($extensions['values'] as $ext) {
-        if ($ext['key'] == 'org.civicoop.civirules' &&$ext['status'] == 'installed') {
-
-          $query = "SELECT id FROM civirule_action WHERE name = %1 AND class_name = %2";
-          $actionId = CRM_Core_DAO::singleValueQuery($query, array(
-            1 => array('pdfapi_send', 'String'),
-            2 => array('CRM_Pdfapi_CivirulesAction', 'String'),
-          ));
-          if ($actionId) {
-            // update params in rule action if any present
-            $query = "SELECT id, action_params FROM civirule_rule_action WHERE action_id = %1";
-            $dao = CRM_Core_DAO::executeQuery($query, array(1 => array((int) $actionId, 'Integer')));
-            while ($dao->fetch()) {
-              $actionParams = unserialize($dao->action_params);
-              $updateRuleAction = FALSE;
-              if (!isset($actionParams['pdf_activity'])) {
-                $actionParams['pdf_activity'] = 0;
-                $updateRuleAction = TRUE;
-              }
-              if (!isset($actionParams['email_activity'])) {
-                $actionParams['email_activity'] = "";
-                $updateRuleAction = TRUE;
-              }
-              if ($updateRuleAction) {
-                $ruleAction = new CRM_Civirules_BAO_RuleAction();
-                $ruleAction->id = $dao->id;
-                $ruleAction->action_params = serialize($actionParams);
-                $ruleAction->save();
-              }
+      $extensions = civicrm_api3('Extension', 'getcount', ['key' => 'org.civicoop.civirules', 'status' => 'installed']);
+      if ($extensions > 0) {
+        $query = "SELECT id FROM civirule_action WHERE name = %1 AND class_name = %2";
+        $actionId = CRM_Core_DAO::singleValueQuery($query, array(
+          1 => array('pdfapi_send', 'String'),
+          2 => array('CRM_Pdfapi_CivirulesAction', 'String'),
+        ));
+        if ($actionId) {
+          // update params in rule action if any present
+          $query = "SELECT id, action_params FROM civirule_rule_action WHERE action_id = %1";
+          $dao = CRM_Core_DAO::executeQuery($query, array(1 => array((int) $actionId, 'Integer')));
+          while ($dao->fetch()) {
+            $actionParams = unserialize($dao->action_params);
+            $updateRuleAction = FALSE;
+            if (!isset($actionParams['pdf_activity'])) {
+              $actionParams['pdf_activity'] = 0;
+              $updateRuleAction = TRUE;
             }
+            if (!isset($actionParams['email_activity'])) {
+              $actionParams['email_activity'] = "";
+              $updateRuleAction = TRUE;
+            }
+            if ($updateRuleAction) {
+              $ruleAction = new CRM_Civirules_BAO_RuleAction();
+              $ruleAction->id = $dao->id;
+              $ruleAction->action_params = serialize($actionParams);
+              $ruleAction->save();
+            }
+
           }
         }
       }
