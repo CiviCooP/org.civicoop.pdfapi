@@ -7,53 +7,56 @@
  * @license http://www.gnu.org/licenses/agpl-3.0.html
  */
 
+use CRM_Pdfapi_ExtensionUtil as E;
+
 class CRM_Pdfapi_Pdf {
   private $_apiParams = array();
+  private $_templateEmailId = NULL;
   private $_emailSubject = NULL;
   private $_htmlMessageEmail = NULL;
   private $_messageTemplatesEmail = NULL;
+  private $_tokensEmail = NULL;
   private $_htmlMessage = NULL;
   private $_subject = NULL;
-  private $_fileName = NULL;
-  private $_cleanName = NULL;
-  private $_fullPathName = NULL;
+  private $_pdfsToBeGenerated = array();
+  private $_createdPdfs = array();
+  private $_createdFileIds = array();
+  private $_domain = NULL;
   private $_version = NULL;
+  private $_toEmail = NULL;
   private $_fromEmail = NULL;
   private $_fromName  = NULL;
   private $_contactIds = array();
+  private $_toContactIds = array();
+  private $_processedCaseIds = array();
 
-  public function __construct($params) {
+  public function __construct($params ) {
     $this->_apiParams = $params;
-  }
 
-  /**
-   * Method to create the email with the pdf
-   *
-   * @throws API_Exception
-   * @throws CRM_Core_Exception
-   */
-  public function create() {
-    $this->validateCaseId();
-    $domain  = CRM_Core_BAO_Domain::getDomain();
+    $this->_domain  = CRM_Core_BAO_Domain::getDomain();
     $this->_version = CRM_Core_BAO_Domain::version();
-    $html    = array();
     list($fromName, $fromEmail) = CRM_Core_BAO_Domain::getNameAndEmail();
     $this->_fromName = isset($this->_apiParams['from_name']) && !empty($this->_apiParams['from_name']) ? $this->_apiParams['from_name'] : $fromName;
     $this->_fromEmail = isset($this->_apiParams['from_email']) && !empty($this->_apiParams['from_email']) ? $this->_apiParams['from_email'] : $fromEmail;
-    if (!preg_match('/[0-9]+(,[0-9]+)*/i', $this->_apiParams['contact_id'])) {
-      throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
+
+    if (isset($this->_apiParams['to_email']) && !empty($this->_apiParams['to_email'])) {
+      $this->_toEmail = $this->_apiParams['to_email'];
     }
-    $this->_contactIds = explode(",", $this->_apiParams['contact_id']);
-    $messageTemplates = $this->getMessageTemplates();
-    $this->_subject = $messageTemplates->msg_subject;
-    $htmlTemplate = $this->formatMessage($messageTemplates);
-    $messageTokens = CRM_Utils_Token::getTokens($htmlTemplate);
+    if (isset($this->_apiParams['contact_id'])) {
+      $this->_toContactIds = explode(",", $this->_apiParams['contact_id']);
+    }
+
+    try {
+      $messageTemplate = $this->getMessageTemplates();
+    } catch (\Exception $e) {
+      $messageTemplate = null;
+    }
 
     // Optional template_email_id, if not default 0
-    $templateEmailId = CRM_Utils_Array::value('body_template_id', $this->_apiParams, 0);
+    $this->_templateEmailId = CRM_Utils_Array::value('body_template_id', $this->_apiParams, 0);
 
-    if ($templateEmailId) {
-      $this->_messageTemplatesEmail = $this->getMessageTemplatesEmail($templateEmailId);
+    if ($this->_templateEmailId) {
+      $this->_messageTemplatesEmail = $this->getMessageTemplatesEmail($this->_templateEmailId);
       $this->_htmlMessageEmail = $this->_messageTemplatesEmail->msg_html;
       if (isset($this->_apiParams['email_subject']) && !empty($this->_apiParams['email_subject'])) {
         $this->_emailSubject = $this->_apiParams['email_subject'];
@@ -61,9 +64,39 @@ class CRM_Pdfapi_Pdf {
       else {
         $this->_emailSubject = $this->_messageTemplatesEmail->msg_subject;
       }
-      $tokensEmail = array_merge_recursive(CRM_Utils_Token::getTokens($this->_htmlMessageEmail),
+      $this->_tokensEmail = array_merge_recursive(CRM_Utils_Token::getTokens($this->_htmlMessageEmail),
         CRM_Utils_Token::getTokens($this->_emailSubject));
+    } else {
+      $this->_htmlMessageEmail = E::ts("CiviCRM has generated a PDF letter");
+      if ($messageTemplate) {
+        $this->_emailSubject = E::ts('PDF Letter from Civicrm - %1', [1 => $messageTemplate->msg_title]);
+      } else {
+        $this->_emailSubject = E::ts('PDF Letter from Civicrm');
+      }
     }
+  }
+
+  /**
+   * Method to create the email with the pdf
+   *
+   * @param $overrideParams
+   * @throws API_Exception
+   * @throws CRM_Core_Exception
+   */
+  public function create($overrideParams=[]) {
+    foreach($overrideParams as $key => $value) {
+      $this->_apiParams[$key] = $value;
+    }
+    $this->validateCaseId();
+    $html    = array();
+    if (!preg_match('/[0-9]+(,[0-9]+)*/i', $this->_apiParams['contact_id'])) {
+      throw new API_Exception('Parameter contact_id must be a unique id or a list of ids separated by comma');
+    }
+    $this->_contactIds = explode(",", $this->_apiParams['contact_id']);
+    $messageTemplate = $this->getMessageTemplates();
+    $this->_subject = $messageTemplate->msg_subject;
+    $htmlTemplate = $this->formatMessage($messageTemplate);
+    $messageTokens = CRM_Utils_Token::getTokens($htmlTemplate);
 
     // get replacement text for these tokens
     $returnProperties = $this->getReturnProperties($messageTokens);
@@ -101,15 +134,12 @@ class CRM_Pdfapi_Pdf {
           continue;
       }
       CRM_Utils_Hook::tokenValues($contact, $contactId, NULL, $messageTokens);
-      if (isset($tokensEmail)) {
-        CRM_Utils_Hook::tokenValues($contact, $contactId, NULL, $tokensEmail);
-      }
       // call token hook
       $hookTokens = array();
       CRM_Utils_Hook::tokens($hookTokens);
       $categories = array_keys($hookTokens);
 
-      $this->_htmlMessage = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessage, $domain, TRUE, $messageTokens, TRUE);
+      $this->_htmlMessage = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessage, $this->_domain, TRUE, $messageTokens, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceContactTokens($this->_htmlMessage, $contact, FALSE, $messageTokens, FALSE, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessage, $contact, $messageTokens, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceHookTokens($this->_htmlMessage, $contact , $categories, TRUE);
@@ -123,67 +153,20 @@ class CRM_Pdfapi_Pdf {
 
       $html[] = $this->_htmlMessage;
 
-      if ($templateEmailId) {
-        $this->_htmlMessageEmail = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessageEmail, $domain, TRUE, $tokensEmail, TRUE);
-        $this->_htmlMessageEmail = CRM_Utils_Token::replaceContactTokens($this->_htmlMessageEmail, $contact, FALSE, $tokensEmail, FALSE, TRUE);
-        $this->_htmlMessageEmail = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessageEmail, $contact, $tokensEmail, TRUE);
-        $this->_htmlMessageEmail = CRM_Utils_Token::replaceHookTokens($this->_htmlMessageEmail, $contact , $categories, TRUE);
-        CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessageEmail, NULL, $contact['contact_id']);
-        if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
-          $smarty = CRM_Core_Smarty::singleton();
-          // also add the contact tokens to the template
-          $smarty->assign_by_ref('contact', $contact);
-          $this->_htmlMessageEmail = $smarty->fetch("string:$this->_htmlMessageEmail");
-        }
-      }
-      else {
-        $this->_htmlMessageEmail = "CiviCRM has generated a PDF letter";
-      }
-
-      if (!empty($this->_emailSubject)) {
-        $this->_emailSubject = CRM_Utils_Token::replaceDomainTokens($this->_emailSubject, $domain, TRUE, $tokensEmail, TRUE);
-        $this->_emailSubject = CRM_Utils_Token::replaceContactTokens($this->_emailSubject, $contact, FALSE, $tokensEmail, FALSE, TRUE);
-        $this->_emailSubject = CRM_Utils_Token::replaceComponentTokens($this->_emailSubject, $contact, $tokensEmail, TRUE);
-        $this->_emailSubject = CRM_Utils_Token::replaceHookTokens($this->_emailSubject, $contact , $categories, TRUE);
-      }
-      else {
-        $this->_emailSubject = 'PDF Letter from Civicrm - ' . $messageTemplates->msg_title;
-      }
-
       //create PDF activities if required
       if (isset($this->_apiParams['pdf_activity']) && $this->_apiParams['pdf_activity'] == TRUE) {
         $this->createPdfActivities($contactId);
       }
     }
-    $hash = md5(uniqid($messageTemplates->msg_title,TRUE));
-    $this->_fileName = CRM_Utils_String::munge($messageTemplates->msg_title).'_' . $hash . '.pdf';
-    $this->_cleanName = CRM_Utils_String::munge($messageTemplates->msg_title) . '.pdf';
-    $pdf = CRM_Utils_PDF_Utils::html2pdf($html, $this->_fileName, TRUE, $messageTemplates->pdf_format_id);
-    // if no email_activity, use temp folder otherwise use customFileUploadDir
-    if (isset($this->_apiParams['email_activity']) && $this->_apiParams['email_activity'] == TRUE) {
-      $config = CRM_Core_Config::singleton();
-      $this->_fullPathName = $config->customFileUploadDir . $this->_fileName;
-    }
-    else {
-      $this->_fullPathName = CRM_Utils_File::tempnam();
-    }
-    file_put_contents($this->_fullPathName, $pdf);
-    unset($pdf); //we don't need the temp file in memory
 
-    //send PDF to e-mail address if given, else to all contacts
-    $this->processPdf();
-    // set up the parameters for CRM_Utils_Mail::send
-    // create Email activities for each contact if required
-    if (isset($this->_apiParams['email_activity']) && $this->_apiParams['email_activity'] == TRUE) {
-      $fileId = $this->createFileForPDF();
-      if ($fileId) {
-        foreach ($this->_contactIds as $contactId) {
-          $email = $this->getPrimaryEmail($contactId);
-          if ($email) {
-            $this->createEmailActivity($contactId, $fileId);
-          }
-        }
-      }
+    $this->_pdfsToBeGenerated[] = [
+      'title' => $messageTemplate->msg_title,
+      'pdf_format_id' => $messageTemplate->pdf_format_id,
+      'html' => $html,
+    ];
+
+    if (isset($this->_apiParams['case_id']) && !empty($this->_apiParams['case_id'])) {
+      $this->_processedCaseIds[] = $this->_apiParams['case_id'];
     }
   }
 
@@ -191,8 +174,39 @@ class CRM_Pdfapi_Pdf {
    * Method to send the actual pdf as an email attachment
    *
    * @param $email
+   * @param $contact_id
    */
-  private function sendPdf($email) {
+  private function sendPdf($email, $contact_id=null) {
+    if ($contact_id) {
+      $messageTokens = CRM_Utils_Token::getTokens($this->_htmlMessageEmail);
+
+      // get replacement text for these tokens
+      $returnProperties = $this->getReturnProperties($messageTokens);
+      list($details) = CRM_Utils_Token::getTokenDetails([$contact_id], $returnProperties, FALSE, FALSE, NULL, $messageTokens);
+      $contact = reset($details);
+
+      if (isset($this->_tokensEmail)) {
+        CRM_Utils_Hook::tokenValues($contact, $contact_id, NULL, $this->_tokensEmail);
+      }
+
+      $this->_htmlMessageEmail = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessageEmail, $this->_domain, TRUE, $this->_tokensEmail, TRUE);
+      $this->_htmlMessageEmail = CRM_Utils_Token::replaceContactTokens($this->_htmlMessageEmail, $contact, FALSE, $this->_tokensEmail, FALSE, TRUE);
+      $this->_htmlMessageEmail = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessageEmail, $contact, $this->_tokensEmail, TRUE);
+      $this->_htmlMessageEmail = CRM_Utils_Token::replaceHookTokens($this->_htmlMessageEmail, $contact, $categories, TRUE);
+      CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessageEmail, NULL, $contact['contact_id']);
+      if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
+        $smarty = CRM_Core_Smarty::singleton();
+        // also add the contact tokens to the template
+        $smarty->assign_by_ref('contact', $contact);
+        $this->_htmlMessageEmail = $smarty->fetch("string:$this->_htmlMessageEmail");
+      }
+
+      $this->_emailSubject = CRM_Utils_Token::replaceDomainTokens($this->_emailSubject, $this->_domain, TRUE, $this->_tokensEmail, TRUE);
+      $this->_emailSubject = CRM_Utils_Token::replaceContactTokens($this->_emailSubject, $contact, FALSE, $this->_tokensEmail, FALSE, TRUE);
+      $this->_emailSubject = CRM_Utils_Token::replaceComponentTokens($this->_emailSubject, $contact, $this->_tokensEmail, TRUE);
+      $this->_emailSubject = CRM_Utils_Token::replaceHookTokens($this->_emailSubject, $contact, $categories, TRUE);
+    }
+
     $mailParams = array(
       'groupName' => 'PDF Letter API',
       'from' => $this->_fromName . ' <' . $this->_fromEmail . '>',
@@ -200,13 +214,7 @@ class CRM_Pdfapi_Pdf {
       'toEmail' => $email,
       'subject' => $this->_emailSubject,
       'html' => $this->_htmlMessageEmail,
-      'attachments' => array(
-        array(
-          'fullPath' => $this->_fullPathName,
-          'mime_type' => 'application/pdf',
-          'cleanName' => $this->_cleanName,
-        )
-      )
+      'attachments' => $this->_createdPdfs,
     );
     $result = CRM_Utils_Mail::send($mailParams);
     if (!$result) {
@@ -223,17 +231,71 @@ class CRM_Pdfapi_Pdf {
   /**
    * Method to send the actual pdf, either to all involved contacts or to specific email address
    *
-   * @throws
+   * @param $combine
+   * @throws \Exception
    */
-  private function processPdf() {
-    if (isset($this->_apiParams['to_email']) && !empty($this->_apiParams['to_email'])) {
-      $this->sendPdf($this->_apiParams['to_email']);
+  public function processPdf($combine=false) {
+    if (!$combine) {
+      foreach ($this->_pdfsToBeGenerated as $pdfToBeGenerated) {
+        $hash = md5(uniqid($pdfToBeGenerated['title'], TRUE));
+        $_fileName = CRM_Utils_String::munge($pdfToBeGenerated['title']) . '_' . $hash . '.pdf';
+        $_cleanName = CRM_Utils_String::munge($pdfToBeGenerated['title']) . '.pdf';
+        $pdf = CRM_Utils_PDF_Utils::html2pdf($pdfToBeGenerated['html'], $_fileName, TRUE, $pdfToBeGenerated['pdf_format_id']);
+        // if no email_activity, use temp folder otherwise use customFileUploadDir
+        if (isset($this->_apiParams['email_activity']) && $this->_apiParams['email_activity'] == TRUE) {
+          $config = CRM_Core_Config::singleton();
+          $_fullPathName = $config->customFileUploadDir . $_fileName;
+          $this->_createdFileIds[] = $this->createFileForPDF($_fileName);
+        }
+        else {
+          $_fullPathName = CRM_Utils_File::tempnam();
+        }
+        file_put_contents($_fullPathName, $pdf);
+        unset($pdf); //we don't need the temp file in memory
+        $this->_createdPdfs[] = [
+          'fullPath' => $_fullPathName,
+          'mime_type' => 'application/pdf',
+          'cleanName' => $_cleanName,
+        ];
+      }
+    } else {
+      $html = [];
+      foreach ($this->_pdfsToBeGenerated as $pdfToBeGenerated) {
+        $hash = md5(uniqid($pdfToBeGenerated['title'], TRUE));
+        $_fileName = CRM_Utils_String::munge($pdfToBeGenerated['title']) . '_' . $hash . '.pdf';
+        $_cleanName = CRM_Utils_String::munge($pdfToBeGenerated['title']) . '.pdf';
+        $html = array_merge($html, $pdfToBeGenerated['html']);
+        $_pdf_format_id = $pdfToBeGenerated['pdf_format_id'];
+      }
+      if (count($html)) {
+        $pdf = CRM_Utils_PDF_Utils::html2pdf($html, $_fileName, TRUE, $_pdf_format_id);
+        // if no email_activity, use temp folder otherwise use customFileUploadDir
+        if (isset($this->_apiParams['email_activity']) && $this->_apiParams['email_activity'] == TRUE) {
+          $config = CRM_Core_Config::singleton();
+          $_fullPathName = $config->customFileUploadDir . $_fileName;
+          $this->_createdFileIds[] = $this->createFileForPDF($_fileName);
+        }
+        else {
+          $_fullPathName = CRM_Utils_File::tempnam();
+        }
+        file_put_contents($_fullPathName, $pdf);
+        unset($pdf); //we don't need the temp file in memory
+        $this->_createdPdfs[] = [
+          'fullPath' => $_fullPathName,
+          'mime_type' => 'application/pdf',
+          'cleanName' => $_cleanName,
+        ];
+      }
+    }
+
+    if ($this->_toEmail) {
+      $this->sendPdf($this->_toEmail);
     }
     else {
-      foreach ($this->_contactIds as $contactId) {
+      foreach ($this->_toContactIds as $contactId) {
         $email = $this->getPrimaryEmail($contactId);
         if ($email) {
-          $this->sendPdf($email);
+          $this->sendPdf($email, $contactId);
         }
         else {
           $message = ts('Email with attached PDF not sent to contact ID ') . $contactId
@@ -243,6 +305,25 @@ class CRM_Pdfapi_Pdf {
           }
           else {
             CRM_Core_Error::debug_log_message($message);
+          }
+        }
+      }
+    }
+
+    // set up the parameters for CRM_Utils_Mail::send
+    // create Email activities for each contact if required
+    if (isset($this->_apiParams['email_activity']) && $this->_apiParams['email_activity'] == TRUE) {
+      if ($this->_createdFileIds) {
+        foreach ($this->_toContactIds as $contactId) {
+          $email = $this->getPrimaryEmail($contactId);
+          if ($email) {
+            if (count($this->_processedCaseIds)) {
+              foreach ($this->_processedCaseIds as $case_id) {
+                $this->createEmailActivity($contactId, $this->_createdFileIds, $case_id);
+              }
+            } else {
+              $this->createEmailActivity($contactId, $this->_createdFileIds);
+            }
           }
         }
       }
@@ -294,12 +375,13 @@ class CRM_Pdfapi_Pdf {
 
   /**
    * Method to save the PDF as a file in the customFileUploadDir
+   * @param $filename
    */
-  private function createFileForPDF() {
+  private function createFileForPDF($filename) {
     try {
       $file = civicrm_api3('File', 'create', array(
         'mime_type' => 'application/pdf',
-        'uri' => $this->_fileName,
+        'uri' => $filename,
       ));
       return $file['id'];
     }
@@ -321,9 +403,10 @@ class CRM_Pdfapi_Pdf {
    * Method to create email activity for contact with PDF as attachment
    *
    * @param int $contactId
-   * @param int $fileId
+   * @param int $fileIds
+   * @param $case_id
    */
-  private function createEmailActivity($contactId, $fileId) {
+  private function createEmailActivity($contactId, $fileIds, $case_id=null) {
     $activityTypeId = $this->getActivityTypeId('email');
     if ($activityTypeId) {
       // first create activity
@@ -355,11 +438,13 @@ class CRM_Pdfapi_Pdf {
           CRM_Activity_BAO_Activity::createActivityTarget($activityTargetParams);
         }
         // add to case if required
-        if (isset($this->_apiParams['case_id']) && !empty($this->_apiParams['case_id'])) {
-          $this->processCaseActivity($activity->id, $this->_apiParams['case_id']);
+        if ($case_id) {
+          $this->processCaseActivity($activity->id, $case_id);
         }
         // add record to civicrm_entity_file to add attachment to activity
-        $this->createEntityFileForPDF($fileId, $activity->id);
+        foreach($fileIds as $fileId) {
+          $this->createEntityFileForPDF($fileId, $activity->id);
+        }
       }
     }
   }
@@ -443,11 +528,11 @@ class CRM_Pdfapi_Pdf {
   /**
    * Method to format the message
    *
-   * @param $messageTemplates
+   * @param $messageTemplate
    * @return string
    */
-  private function formatMessage($messageTemplates){
-    $this->_htmlMessage = $messageTemplates->msg_html;
+  private function formatMessage($messageTemplate){
+    $this->_htmlMessage = $messageTemplate->msg_html;
 
     //time being hack to strip '&nbsp;'
     //from particular letter line, CRM-6798
@@ -499,19 +584,19 @@ class CRM_Pdfapi_Pdf {
   private function getMessageTemplates() {
     // Compatibility with CiviCRM > 4.3
     if ($this->_version >= 4.4) {
-      $messageTemplates =  new CRM_Core_DAO_MessageTemplate();
+      $messageTemplate =  new CRM_Core_DAO_MessageTemplate();
     } else {
-      $messageTemplates = new CRM_Core_DAO_MessageTemplates();
+      $messageTemplate = new CRM_Core_DAO_MessageTemplates();
     }
-    $messageTemplates->id = $this->_apiParams['template_id'];
-    if (!$messageTemplates->find(TRUE)) {
+    $messageTemplate->id = $this->_apiParams['template_id'];
+    if (!$messageTemplate->find(TRUE)) {
       throw new API_Exception('Could not find template with ID: ' . $this->_apiParams['template_id']);
     }
     // Optional pdf_format_id, if not default 0
     if (isset($this->_apiParams['pdf_format_id'])) {
-      $messageTemplates->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $this->_apiParams, 0);
+      $messageTemplate->pdf_format_id = CRM_Utils_Array::value('pdf_format_id', $this->_apiParams, 0);
     }
-    return $messageTemplates;
+    return $messageTemplate;
   }
 
   /**
