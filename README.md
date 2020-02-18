@@ -32,7 +32,7 @@ Parameters for the api are specified below:
 - email_subject: (optional) Provide a custom e-mail subject
 - pdf_activity: create a pdf activity
 - email_activity: create an e-mail activity
-- pdf_files: specification of all the pdf files to be generated.
+- pdfs: specification of all the pdf files to be generated.
   The next example creates two pdf's for two cases and two contacts and each file is generated using a separate template:
   `[
       {"case_id":2,"contact_id":10,"template_id":69},
