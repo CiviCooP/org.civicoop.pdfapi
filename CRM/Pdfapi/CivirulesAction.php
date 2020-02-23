@@ -100,7 +100,7 @@ class CRM_Pdfapi_CivirulesAction extends CRM_CivirulesActions_Generic_Api {
    * @param $templateId
    * @return string
    */
-  private function getTemplateTitle($templateId) {
+  protected function getTemplateTitle($templateId) {
     $templateTitle = 'unknown template';
     // Compatibility with CiviCRM > 4.3
     $version = CRM_Core_BAO_Domain::version();
