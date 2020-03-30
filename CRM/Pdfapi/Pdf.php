@@ -315,14 +315,9 @@ class CRM_Pdfapi_Pdf {
     if (isset($this->_apiParams['email_activity']) && $this->_apiParams['email_activity'] == TRUE) {
       if ($this->_createdFileIds) {
         foreach ($this->_toContactIds as $contactId) {
-          $email = $this->getPrimaryEmail($contactId);
-          if ($email) {
-            if (count($this->_processedCaseIds)) {
-              foreach ($this->_processedCaseIds as $case_id) {
-                $this->createEmailActivity($contactId, $this->_createdFileIds, $case_id);
-              }
-            } else {
-              $this->createEmailActivity($contactId, $this->_createdFileIds);
+          if (count($this->_processedCaseIds)) {
+            foreach ($this->_processedCaseIds as $case_id) {
+              $this->createEmailActivity($contactId, $this->_createdFileIds, $case_id);
             }
           }
         }
@@ -403,7 +398,7 @@ class CRM_Pdfapi_Pdf {
    * Method to create email activity for contact with PDF as attachment
    *
    * @param int $contactId
-   * @param int $fileIds
+   * @param array $fileIds
    * @param $case_id
    */
   private function createEmailActivity($contactId, $fileIds, $case_id=null) {
