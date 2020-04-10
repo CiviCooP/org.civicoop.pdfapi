@@ -142,6 +142,9 @@ class CRM_Pdfapi_Pdf {
       $this->_htmlMessage = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessage, $this->_domain, TRUE, $messageTokens, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceContactTokens($this->_htmlMessage, $contact, FALSE, $messageTokens, FALSE, TRUE);
       $this->_htmlMessage = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessage, $contact, $messageTokens, TRUE);
+      if (isset($this->_apiParams['case_id']) && !empty($this->_apiParams['case_id'])) {
+        $this->_htmlMessage = CRM_Utils_Token::replaceCaseTokens($this->_apiParams['case_id'], $this->_htmlMessage, $messageTokens);
+      }
       $this->_htmlMessage = CRM_Utils_Token::replaceHookTokens($this->_htmlMessage, $contact , $categories, TRUE);
       CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessage, NULL, $contact['contact_id']);
       if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
@@ -177,6 +180,10 @@ class CRM_Pdfapi_Pdf {
    * @param $contact_id
    */
   private function sendPdf($email, $contact_id=null) {
+    $caseId = null;
+    if ($this->_processedCaseIds && count($this->_processedCaseIds) > 0) {
+      $caseId = reset($this->_processedCaseIds);
+    }
     if ($contact_id) {
       $messageTokens = CRM_Utils_Token::getTokens($this->_htmlMessageEmail);
 
@@ -192,6 +199,9 @@ class CRM_Pdfapi_Pdf {
       $this->_htmlMessageEmail = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessageEmail, $this->_domain, TRUE, $this->_tokensEmail, TRUE);
       $this->_htmlMessageEmail = CRM_Utils_Token::replaceContactTokens($this->_htmlMessageEmail, $contact, FALSE, $this->_tokensEmail, FALSE, TRUE);
       $this->_htmlMessageEmail = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessageEmail, $contact, $this->_tokensEmail, TRUE);
+      if ($caseId) {
+        $this->_htmlMessageEmail = CRM_Utils_Token::replaceCaseTokens($caseId, $this->_htmlMessageEmail, $this->_tokensEmail);
+      }
       $this->_htmlMessageEmail = CRM_Utils_Token::replaceHookTokens($this->_htmlMessageEmail, $contact, $categories, TRUE);
       CRM_Utils_Token::replaceGreetingTokens($this->_htmlMessageEmail, NULL, $contact['contact_id']);
       if (defined('CIVICRM_MAIL_SMARTY') && CIVICRM_MAIL_SMARTY) {
@@ -204,6 +214,9 @@ class CRM_Pdfapi_Pdf {
       $this->_emailSubject = CRM_Utils_Token::replaceDomainTokens($this->_emailSubject, $this->_domain, TRUE, $this->_tokensEmail, TRUE);
       $this->_emailSubject = CRM_Utils_Token::replaceContactTokens($this->_emailSubject, $contact, FALSE, $this->_tokensEmail, FALSE, TRUE);
       $this->_emailSubject = CRM_Utils_Token::replaceComponentTokens($this->_emailSubject, $contact, $this->_tokensEmail, TRUE);
+      if ($caseId) {
+        $this->_emailSubject = CRM_Utils_Token::replaceCaseTokens($caseId, $this->_emailSubject, $this->_tokensEmail);
+      }
       $this->_emailSubject = CRM_Utils_Token::replaceHookTokens($this->_emailSubject, $contact, $categories, TRUE);
     }
 

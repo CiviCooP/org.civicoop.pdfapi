@@ -37,8 +37,13 @@ class CRM_Pdfapi_CivirulesAction extends CRM_CivirulesActions_Generic_Api {
    * @access protected
    */
   protected function alterApiParameters($parameters, CRM_Civirules_TriggerData_TriggerData $triggerData) {
+    $actionParams = $this->getActionParameters();
+
     $parameters['contact_id'] = $triggerData->getContactId();
-    // todo check if the file_on_case is yes, if so, try to set the case_id
+    if (isset($actionParams['file_on_case']) && $actionParams['file_on_case'] == TRUE) {
+      $case = $triggerData->getEntityData('Case');
+      $parameters['case_id'] = $case['id'];
+    }
     return $parameters;
   }
 
