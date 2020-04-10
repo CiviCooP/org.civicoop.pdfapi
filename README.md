@@ -1,3 +1,7 @@
+# Moved to Gitlab
+
+See: https://lab.civicrm.org/extensions/pdfapi
+
 # org.civicoop.pdfapi
 PDF API for CiviCRM to create a PDF file and send it to a specified e-mail address.
 
