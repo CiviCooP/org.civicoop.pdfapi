@@ -110,6 +110,7 @@ class CRM_Pdfapi_Pdf {
       }
       $this->_htmlMessage = $htmlTemplate;
       list($details) = CRM_Utils_Token::getTokenDetails(array($contactId), $returnProperties, false, false, null, $messageTokens);
+      CRM_Utils_Hook::tokenValues($details, $contactId, NULL, $messageTokens);
       $contact = reset( $details );
       // add case_id if present
       if (isset($this->_apiParams['case_id']) && !empty($this->_apiParams['case_id'])) {
@@ -133,7 +134,6 @@ class CRM_Pdfapi_Pdf {
         else
           continue;
       }
-      CRM_Utils_Hook::tokenValues($contact, $contactId, NULL, $messageTokens);
       // call token hook
       $hookTokens = array();
       CRM_Utils_Hook::tokens($hookTokens);
@@ -190,14 +190,13 @@ class CRM_Pdfapi_Pdf {
       // get replacement text for these tokens
       $returnProperties = $this->getReturnProperties($messageTokens);
       list($details) = CRM_Utils_Token::getTokenDetails([$contact_id], $returnProperties, FALSE, FALSE, NULL, $messageTokens);
+      if (isset($this->_tokensEmail)) {
+        CRM_Utils_Hook::tokenValues($details, $contact_id, NULL, $this->_tokensEmail);
+      }
       $contact = reset($details);
 
-      if (isset($this->_tokensEmail)) {
-        CRM_Utils_Hook::tokenValues($contact, $contact_id, NULL, $this->_tokensEmail);
-      }
-
       $this->_htmlMessageEmail = CRM_Utils_Token::replaceDomainTokens($this->_htmlMessageEmail, $this->_domain, TRUE, $this->_tokensEmail, TRUE);
-      $this->_htmlMessageEmail = CRM_Utils_Token::replaceContactTokens($this->_htmlMessageEmail, $contact, FALSE, $this->_tokensEmail, FALSE, TRUE);
+      $this->_htmlMessageEmail = CRM_Utils_Token::replaceContactTokens($this->_htmlMessageEmail, $details, FALSE, $this->_tokensEmail, FALSE, TRUE);
       $this->_htmlMessageEmail = CRM_Utils_Token::replaceComponentTokens($this->_htmlMessageEmail, $contact, $this->_tokensEmail, TRUE);
       if ($caseId) {
         $this->_htmlMessageEmail = CRM_Utils_Token::replaceCaseTokens($caseId, $this->_htmlMessageEmail, $this->_tokensEmail);
